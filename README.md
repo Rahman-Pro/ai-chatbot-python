@@ -9,7 +9,8 @@ A fast, beautiful AI chatbot built with **Python**, **Streamlit**, and **Groq AP
 
 ## 🌐 Live Demo
 
-You can try the static web version of the chatbot directly in your browser:
+Try the web version of the chatbot directly in your browser — no installation needed:
+
 👉 **[https://rahman-pro.github.io/ai-chatbot-python/](https://rahman-pro.github.io/ai-chatbot-python/)**
 
 ---
@@ -20,8 +21,7 @@ You can try the static web version of the chatbot directly in your browser:
 - ⚡ **Ultra-Fast Responses** — Powered by Groq's LPU inference engine
 - 🎨 **Premium UI** — Beautiful gradient design with dark/light mode
 - 💬 **Chat History** — Full conversation context maintained
-- 📋 **Export Chat** — Download your conversations as text files
-- 🔒 **Privacy First** — API key stays in your browser session only
+- 🔒 **Privacy First** — API key stays in your browser only, never sent to any server
 - 📱 **Responsive** — Works on desktop and mobile
 - 🆓 **100% Free** — No server costs, free API, free hosting
 
@@ -30,8 +30,8 @@ You can try the static web version of the chatbot directly in your browser:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ai-chatbot.git
-cd ai-chatbot
+git clone https://github.com/rahman-pro/ai-chatbot-python.git
+cd ai-chatbot-python
 ```
 
 ### 2. Install Dependencies
@@ -43,7 +43,7 @@ pip install -r requirements.txt
 ### 3. Get Free Groq API Key
 
 1. Go to [console.groq.com](https://console.groq.com/keys)
-2. Sign up (free)
+2. Sign up (free, no credit card needed)
 3. Create an API key
 
 ### 4. Run the Chatbot
@@ -65,12 +65,13 @@ The app will open at `http://localhost:8501` 🎉
 ## 📁 Project Structure
 
 ```
-ai-chatbot/
-├── app.py               # Main application
+ai-chatbot-python/
+├── index.html           # Static web version (GitHub Pages)
+├── style.css            # Web UI styles
+├── app.js               # Web chatbot logic
+├── app.py               # Streamlit Python version
 ├── requirements.txt     # Python dependencies
-├── README.md            # Documentation
-└── .streamlit/
-    └── config.toml      # Streamlit theme config
+└── README.md            # Documentation
 ```
 
 ## 🛠️ Tech Stack
@@ -80,7 +81,7 @@ ai-chatbot/
 | **Python 3.9+** | Core language |
 | **Streamlit** | Web UI framework |
 | **Groq API** | AI inference (Llama 3, Gemma, Mixtral) |
-| **Requests** | HTTP client for API calls |
+| **HTML/CSS/JS** | Static web version |
 
 ## 📜 License
 
