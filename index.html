@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot — Powered by Groq</title>
+    <meta name="description" content="A fast, free AI chatbot powered by Groq and Llama 3. No server required.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- API Key Modal -->
+    <div id="api-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon">🔑</div>
+            <h2>Welcome to AI Chatbot</h2>
+            <p>Enter your free <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq API Key</a> to start chatting.</p>
+            <div class="input-group">
+                <input type="password" id="api-key-input" placeholder="gsk_xxxxxxxxxxxxxxxx" autocomplete="off">
+                <button id="save-key-btn" class="btn-primary">Start Chatting →</button>
+            </div>
+            <p class="hint">Your key stays in your browser. Never sent anywhere except Groq.</p>
+        </div>
+    </div>
+
+    <!-- Main Chat Interface -->
+    <div id="app" class="app hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">AI Chat</span>
+                </div>
+                <button id="new-chat-btn" class="btn-icon" title="New Chat">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+            </div>
+            <div id="chat-history" class="chat-history">
+                <!-- Chat history items will be dynamically added -->
+            </div>
+            <div class="sidebar-footer">
+                <button id="clear-all-btn" class="btn-ghost">🗑️ Clear All Chats</button>
+                <button id="change-key-btn" class="btn-ghost">🔑 Change API Key</button>
+                <select id="model-select" class="model-select">
+                    <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                    <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
+                    <option value="gemma2-9b-it">Gemma 2 9B</option>
+                    <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                </select>
+            </div>
+        </aside>
+
+        <!-- Chat Area -->
+        <main class="chat-main">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <button id="menu-toggle" class="btn-icon menu-toggle">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="top-bar-title">
+                    <span id="current-model-name">Llama 3.3 70B</span>
+                    <span class="badge">Free</span>
+                </div>
+                <div class="top-bar-actions">
+                    <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
+                        <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Messages -->
+            <div id="messages-container" class="messages-container">
+                <div id="welcome-screen" class="welcome-screen">
+                    <div class="welcome-icon">⚡</div>
+                    <h1>How can I help you today?</h1>
+                    <p>Powered by Groq — the fastest AI inference engine.</p>
+                    <div class="suggestion-grid">
+                        <button class="suggestion-card" data-prompt="Explain quantum computing in simple terms">
+                            <span class="suggestion-icon">🔬</span>
+                            <span>Explain quantum computing simply</span>
+                        </button>
+                        <button class="suggestion-card" data-prompt="Write a professional email to a client about a project delay">
+                            <span class="suggestion-icon">📧</span>
+                            <span>Write a professional email</span>
+                        </button>
+                        <button class="suggestion-card" data-prompt="Create a Python function to sort a list of dictionaries by a specific key">
+                            <span class="suggestion-icon">💻</span>
+                            <span>Write a Python function</span>
+                        </button>
+                        <button class="suggestion-card" data-prompt="Give me 5 creative business ideas for 2025">
+                            <span class="suggestion-icon">💡</span>
+                            <span>Creative business ideas</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="messages" class="messages">
+                    <!-- Messages will be dynamically added -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <textarea id="user-input" placeholder="Type your message..." rows="1" autofocus></textarea>
+                    <button id="send-btn" class="send-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                </div>
+                <p class="input-hint">AI can make mistakes. Verify important information.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
