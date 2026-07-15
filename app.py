@@ -1,369 +1,299 @@
 import streamlit as st
-import requests
-import json
-from datetime import datetime
+from groq import Groq
 
-# ─────────────────────────────────────────────
-# Page Configuration
-# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI Chatbot — Powered by Groq",
-    page_icon="⚡",
-    layout="centered",
-    initial_sidebar_state="expanded",
+    page_title="AI English Tutor",
+    page_icon="🎓",
+    layout="wide"
 )
 
-# ─────────────────────────────────────────────
-# Custom CSS for Premium Look
-# ─────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-    /* Global */
-    .stApp {
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* Chat Messages */
-    .user-msg {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 14px 18px;
-        border-radius: 18px 18px 4px 18px;
-        margin: 8px 0;
-        max-width: 85%;
-        margin-left: auto;
-        font-size: 15px;
-        line-height: 1.6;
-        box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
-    }
-
-    .bot-msg {
-        background: #f0f2f6;
-        color: #1a1a2e;
-        padding: 14px 18px;
-        border-radius: 18px 18px 18px 4px;
-        margin: 8px 0;
-        max-width: 85%;
-        font-size: 15px;
-        line-height: 1.6;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-
-    /* Dark mode bot message */
-    [data-theme="dark"] .bot-msg {
-        background: #262730;
-        color: #fafafa;
-    }
-
-    .msg-time {
-        font-size: 11px;
-        color: #999;
-        margin-top: 4px;
-    }
-
-    /* Welcome */
-    .welcome-box {
-        text-align: center;
-        padding: 60px 20px;
-    }
-
-    .welcome-box h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-
-    .welcome-box p {
-        color: #888;
-        font-size: 1.05rem;
-    }
-
-    /* Suggestion buttons */
-    .stButton > button {
-        border-radius: 12px !important;
-        padding: 10px 20px !important;
-        font-weight: 500 !important;
-        transition: all 0.2s ease !important;
-    }
-
-    .stButton > button:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    }
-
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* Sidebar styling */
-    .sidebar-title {
-        font-size: 1.3rem;
-        font-weight: 700;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .stats-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 16px;
-        border-radius: 12px;
-        margin: 10px 0;
-        text-align: center;
-    }
-
-    .stats-card h3 {
-        margin: 0;
-        font-size: 1.8rem;
-        font-weight: 700;
-    }
-
-    .stats-card p {
-        margin: 4px 0 0 0;
-        font-size: 0.85rem;
-        opacity: 0.85;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# Session State Initialization
-# ─────────────────────────────────────────────
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-
-if "total_messages" not in st.session_state:
-    st.session_state.total_messages = 0
-
-if "model" not in st.session_state:
-    st.session_state.model = "llama-3.3-70b-versatile"
-
-
-# ─────────────────────────────────────────────
-# Groq API Call Function
-# ─────────────────────────────────────────────
-def chat_with_groq(user_message: str, chat_history: list) -> str:
-    """Send message to Groq API and return the response."""
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-
-    headers = {
-        "Authorization": f"Bearer {st.session_state.api_key}",
-        "Content-Type": "application/json",
-    }
-
-    # Build messages list from history
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a helpful, friendly AI assistant. "
-                "Provide clear, concise, and accurate answers. "
-                "Use markdown formatting when helpful."
-            ),
-        }
-    ]
-
-    # Add chat history (last 20 messages for context)
-    for msg in chat_history[-20:]:
-        messages.append({
-            "role": msg["role"],
-            "content": msg["content"],
-        })
-
-    # Add current user message
-    messages.append({"role": "user", "content": user_message})
-
-    payload = {
-        "model": st.session_state.model,
-        "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 2048,
-        "top_p": 0.9,
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
-
-    except requests.exceptions.HTTPError as e:
-        if response.status_code == 401:
-            return "❌ **Invalid API Key.** Please check your Groq API key and try again."
-        elif response.status_code == 429:
-            return "⏳ **Rate limit reached.** Please wait a moment and try again."
-        else:
-            return f"❌ **API Error ({response.status_code}):** {str(e)}"
-
-    except requests.exceptions.ConnectionError:
-        return "❌ **Connection Error.** Please check your internet connection."
-
-    except Exception as e:
-        return f"❌ **Error:** {str(e)}"
-
-
-# ─────────────────────────────────────────────
-# Sidebar
-# ─────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">⚡ AI Chatbot</div>', unsafe_allow_html=True)
+    st.title("🎓 AI English Tutor")
 
-    # API Key Input
     api_key = st.text_input(
-        "🔑 Groq API Key",
+        "Groq API Key",
         type="password",
-        value=st.session_state.api_key,
-        placeholder="gsk_xxxxxxxxxxxxxxxx",
-        help="Get your free key at [console.groq.com/keys](https://console.groq.com/keys)",
+        placeholder="gsk_..."
     )
 
-    if api_key != st.session_state.api_key:
-        st.session_state.api_key = api_key
-
-    # Model Selection
-    model_options = {
-        "llama-3.3-70b-versatile": "🦙 Llama 3.3 70B (Best)",
-        "llama-3.1-8b-instant": "🚀 Llama 3.1 8B (Fastest)",
-        "gemma2-9b-it": "💎 Gemma 2 9B",
-        "mixtral-8x7b-32768": "🌀 Mixtral 8x7B",
-    }
-
-    selected_model = st.selectbox(
-        "🤖 AI Model",
-        options=list(model_options.keys()),
-        format_func=lambda x: model_options[x],
-        index=0,
-    )
-    st.session_state.model = selected_model
-
-    st.divider()
-
-    # Stats
-    st.markdown(
-        f"""
-        <div class="stats-card">
-            <h3>{st.session_state.total_messages}</h3>
-            <p>Messages Sent</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    level = st.selectbox(
+        "Your English Level",
+        ["Beginner", "Elementary", "Intermediate", "Advanced"]
     )
 
-    st.divider()
-
-    # Actions
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-    with col2:
-        if st.button("📋 Export", use_container_width=True):
-            if st.session_state.messages:
-                chat_text = "\n\n".join(
-                    [f"{'You' if m['role'] == 'user' else 'AI'}: {m['content']}"
-                     for m in st.session_state.messages]
-                )
-                st.download_button(
-                    "💾 Download",
-                    chat_text,
-                    file_name=f"chat_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                    use_container_width=True,
-                )
-
-    st.divider()
-    st.caption("Built with Python 🐍 & Streamlit")
-    st.caption("[GitHub](https://github.com) • [Groq](https://groq.com)")
-
-
-# ─────────────────────────────────────────────
-# Main Chat Area
-# ─────────────────────────────────────────────
-
-# Check API Key
-if not st.session_state.api_key:
-    st.markdown(
-        """
-        <div class="welcome-box">
-            <h1>⚡ AI Chatbot</h1>
-            <p>Enter your free Groq API key in the sidebar to start chatting.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    native_language = st.selectbox(
+        "Your Native Language",
+        ["Bengali", "Hindi", "Arabic", "Spanish", "Other"]
     )
 
-    st.info("👈 Enter your **Groq API Key** in the sidebar to begin. [Get free key →](https://console.groq.com/keys)")
+    model = st.selectbox(
+        "AI Model",
+        [
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile"
+        ]
+    )
 
+if not api_key:
+    st.title("🎓 AI English Tutor")
+    st.info("বাম পাশের sidebar-এ আপনার Groq API Key দিন।")
+
+    st.markdown("""
+    ### Free Groq API Key পাওয়ার নিয়ম
+
+    1. [console.groq.com](https://console.groq.com) খুলুন
+    2. Account তৈরি বা Login করুন
+    3. API Keys থেকে নতুন key তৈরি করুন
+    4. Key-টি sidebar-এ paste করুন
+
+    **আপনার API key কারও সঙ্গে share করবেন না।**
+    """)
     st.stop()
 
+client = Groq(api_key=api_key)
 
-# Welcome screen with suggestions (when no messages)
-if not st.session_state.messages:
-    st.markdown(
-        """
-        <div class="welcome-box">
-            <h1>⚡ How can I help you?</h1>
-            <p>Powered by Groq — the fastest AI inference engine</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-    # Suggestion buttons
-    suggestions = [
-        ("🔬 Explain quantum computing", "Explain quantum computing in simple terms with examples"),
-        ("📧 Write a professional email", "Write a professional email to a client about a project delay"),
-        ("💻 Python code example", "Create a Python function to sort a list of dictionaries by a specific key"),
-        ("💡 Business ideas", "Give me 5 creative and unique business ideas for 2025"),
+def ask_ai(system_prompt, user_prompt, history=None, temperature=0.4):
+    messages = [
+        {"role": "system", "content": system_prompt}
     ]
 
-    cols = st.columns(2)
-    for i, (label, prompt) in enumerate(suggestions):
-        with cols[i % 2]:
-            if st.button(label, key=f"sug_{i}", use_container_width=True):
-                st.session_state.messages.append({"role": "user", "content": prompt})
-                with st.spinner("Thinking..."):
-                    response = chat_with_groq(prompt, [])
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.session_state.total_messages += 1
-                st.rerun()
+    if history:
+        messages.extend(history)
+
+    messages.append({
+        "role": "user",
+        "content": user_prompt
+    })
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=1200
+    )
+
+    return response.choices[0].message.content
 
 
-# Display chat messages
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        with st.chat_message("user", avatar="👤"):
-            st.markdown(msg["content"])
-    else:
-        with st.chat_message("assistant", avatar="⚡"):
-            st.markdown(msg["content"])
+st.title("🎓 AI English Tutor")
+st.caption("Practice English with your personal AI teacher")
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "💬 Conversation",
+    "✏️ Correction",
+    "📖 Dictionary",
+    "🌐 Translator"
+])
 
 
-# Chat input
-if prompt := st.chat_input("Type your message here..."):
-    # Add user message
-    st.session_state.messages.append({"role": "user", "content": prompt})
+# Conversation
+with tab1:
+    st.header("💬 English Conversation")
 
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(prompt)
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    # Get AI response
-    with st.chat_message("assistant", avatar="⚡"):
-        with st.spinner("Thinking..."):
-            response = chat_with_groq(prompt, st.session_state.messages[:-1])
-        st.markdown(response)
+    user_message = st.chat_input(
+        "Write something in English..."
+    )
 
-    # Add assistant message
-    st.session_state.messages.append({"role": "assistant", "content": response})
-    st.session_state.total_messages += 1
-    st.rerun()
+    if user_message:
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_message
+        })
+
+        system_prompt = f"""
+You are a friendly English teacher.
+
+Student English level: {level}
+Student native language: {native_language}
+
+Have a natural conversation in English.
+Gently correct important mistakes after your reply.
+Use this format when correction is needed:
+
+📝 Correction:
+Wrong: ...
+Correct: ...
+Why: ...
+
+Keep your answer friendly and not too long.
+"""
+
+        try:
+            answer = ask_ai(
+                system_prompt,
+                user_message,
+                history=st.session_state.chat_history[:-1],
+                temperature=0.7
+            )
+
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": answer
+            })
+
+            st.rerun()
+
+        except Exception as error:
+            st.error(f"Error: {error}")
+
+    if st.button("🗑️ Clear Conversation"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+
+# Sentence Correction
+with tab2:
+    st.header("✏️ Sentence Correction")
+
+    sentence = st.text_area(
+        "Write your English sentence or paragraph:",
+        height=180,
+        placeholder="Example: I am go to market yesterday."
+    )
+
+    if st.button("✏️ Correct My English"):
+        if not sentence.strip():
+            st.warning("Please write something first.")
+        else:
+            prompt = f"""
+Correct the following English text for a {level} student.
+
+Give your answer in this format:
+
+## ✅ Correct Version
+Write the corrected sentence.
+
+## 🔍 Mistakes
+Explain each mistake simply.
+
+## 💡 Grammar Tip
+Give one or two useful grammar tips.
+
+## 🌟 Natural Version
+Write a more natural version if possible.
+
+Text:
+{sentence}
+"""
+
+            try:
+                with st.spinner("Checking your English..."):
+                    result = ask_ai(
+                        "You are a patient and expert English grammar teacher.",
+                        prompt
+                    )
+
+                st.markdown(result)
+
+            except Exception as error:
+                st.error(f"Error: {error}")
+
+
+# Dictionary
+with tab3:
+    st.header("📖 Word Dictionary")
+
+    word = st.text_input(
+        "Enter an English word:",
+        placeholder="Example: beautiful"
+    )
+
+    if st.button("🔍 Explain Word"):
+        if not word.strip():
+            st.warning("Please enter a word.")
+        else:
+            prompt = f"""
+Explain the English word "{word}" for a {level} student.
+
+Include:
+
+## 🔤 Word
+## 📌 Meaning
+Explain in simple English.
+
+## 🗣️ Pronunciation
+Give pronunciation.
+
+## 🌐 Bengali/Native Language Meaning
+Give the meaning in {native_language}.
+
+## 💬 Example Sentences
+Give three example sentences.
+
+## 🔄 Synonyms
+Give three synonyms.
+
+## 🚫 Common Mistake
+Mention one common mistake.
+"""
+
+            try:
+                with st.spinner("Finding word meaning..."):
+                    result = ask_ai(
+                        "You are an English dictionary and vocabulary teacher.",
+                        prompt
+                    )
+
+                st.markdown(result)
+
+            except Exception as error:
+                st.error(f"Error: {error}")
+
+
+# Translator
+with tab4:
+    st.header("🌐 Bengali to English Translator")
+
+    source_text = st.text_area(
+        "Write Bengali or another language:",
+        height=180,
+        placeholder="আমি ইংরেজি শিখতে চাই।"
+    )
+
+    if st.button("🌐 Translate and Explain"):
+        if not source_text.strip():
+            st.warning("Please write something first.")
+        else:
+            prompt = f"""
+Translate the following text into natural English.
+
+Student level: {level}
+Native language: {native_language}
+
+Give your answer in this format:
+
+## 🌐 English Translation
+Give the translation.
+
+## 🔤 Important Words
+Explain important vocabulary.
+
+## 📝 Grammar Explanation
+Explain the important grammar simply.
+
+## 💬 Another Natural Version
+Give another way to say it.
+
+Text:
+{source_text}
+"""
+
+            try:
+                with st.spinner("Translating..."):
+                    result = ask_ai(
+                        "You are an English translator and teacher.",
+                        prompt
+                    )
+
+                st.markdown(result)
+
+            except Exception as error:
+                st.error(f"Error: {error}")
