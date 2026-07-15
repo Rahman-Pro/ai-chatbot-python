@@ -5,6 +5,14 @@ A fast, beautiful AI chatbot built with **Python**, **Streamlit**, and **Groq AP
 ![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red?logo=streamlit&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge)](https://rahman-pro.github.io/ai-chatbot-python/)
+
+## 🌐 Live Demo
+
+You can try the static web version of the chatbot directly in your browser:
+👉 **[https://rahman-pro.github.io/ai-chatbot-python/](https://rahman-pro.github.io/ai-chatbot-python/)**
+
+---
 
 ## ✨ Features
 
@@ -80,7 +88,9 @@ MIT License — free for personal and commercial use.
 
 ## 👨‍💻 Author
 
-Built with ❤️ using Python
+Built with ❤️ by **Atiqur Rahman**
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/atiqur-rahman-pro/)
 
 ---
 
