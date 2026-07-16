@@ -222,7 +222,34 @@ function loadChat(chatId) {
         welcomeScreen.classList.add('hidden');
         messagesDiv.parentElement.classList.remove('welcome-bg');
         
-        activeChat.messages.forEach(msg => {
+        activeChat.messages.forEach((msg, idx) => {
+            if (msg.role === 'tool') {
+                return;
+            }
+            if (msg.tool_calls) {
+                const thoughtId = 'thought_hist_' + idx;
+                appendThoughtBox(thoughtId);
+                let logHTML = '';
+                
+                msg.tool_calls.forEach(toolCall => {
+                    const funcName = toolCall.function.name;
+                    const funcArgs = toolCall.function.arguments;
+                    
+                    logHTML += `<div class="tool-call-log">⚙️ <strong>Running Tool:</strong> <code>${funcName}</code></div>`;
+                    logHTML += `<div class="tool-call-log">💬 <strong>Args:</strong> <code>${funcArgs}</code></div>`;
+                    
+                    const toolResp = activeChat.messages.find((m, i) => i > idx && m.role === 'tool' && m.tool_call_id === toolCall.id);
+                    if (toolResp) {
+                        const trimmedOut = toolResp.content.length > 150 ? toolResp.content.substring(0, 150) + '...' : toolResp.content;
+                        logHTML += `<div class="tool-call-log">✅ <strong>Output:</strong> ${escapedHTML(trimmedOut)}</div>`;
+                    }
+                });
+                
+                updateThoughtLogs(thoughtId, logHTML);
+                const detailsEl = document.querySelector(`#${thoughtId} details`);
+                if (detailsEl) detailsEl.removeAttribute('open');
+                return;
+            }
             appendMessageHTML(msg.role, msg.content);
         });
         scrollToBottom();
@@ -278,6 +305,133 @@ function deleteChat(chatId) {
     initApp();
 }
 
+// --- Agent Tools and Functions ---
+
+const agentTools = [
+    {
+        type: "function",
+        function: {
+            name: "get_current_time",
+            description: "Get the current system/local date and time.",
+            parameters: { type: "object", properties: {} }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "calculate",
+            description: "Evaluate basic mathematical expressions. Supporting standard operators: +, -, *, /, (, ).",
+            parameters: {
+                type: "object",
+                properties: {
+                    expression: {
+                        type: "string",
+                        description: "The math equation to compute, e.g., '12 * (3.5 + 4)'"
+                    }
+                },
+                required: ["expression"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "search_wikipedia",
+            description: "Search Wikipedia for general information on concepts, historical events, famous people, or topics.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "The search term to query Wikipedia for."
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    }
+];
+
+function getCurrentTime() {
+    return "Current local time: " + new Date().toLocaleString();
+}
+
+function calculateExpression(expression) {
+    try {
+        const clean = expression.replace(/[^0-9+\-*/().\s]/g, '');
+        const result = Function('"use strict"; return (' + clean + ')')();
+        return `Calculation Result for '${expression}': ${result}`;
+    } catch (e) {
+        return `Error evaluating calculation: ${e.message}`;
+    }
+}
+
+async function searchWikipedia(query) {
+    try {
+        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
+        const res = await fetch(searchUrl);
+        const data = await res.json();
+        const results = data.query?.search;
+        if (!results || results.length === 0) {
+            return `No Wikipedia results found for '${query}'.`;
+        }
+        const topTitle = results[0].title;
+        const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(topTitle)}&format=json&origin=*`;
+        const summaryRes = await fetch(summaryUrl);
+        const summaryData = await summaryRes.json();
+        const pages = summaryData.query?.pages;
+        const pageId = Object.keys(pages)[0];
+        if (pageId === "-1") {
+            return `Found Wikipedia article '${topTitle}', but failed to retrieve its summary content.`;
+        }
+        return `Source: Wikipedia - Article: ${topTitle}\n\nSummary:\n${pages[pageId].extract}`;
+    } catch (e) {
+        return `Error retrieving Wikipedia summary: ${e.message}`;
+    }
+}
+
+// --- DOM Rendering Helpers for Thoughts ---
+
+function appendThoughtBox(id) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ai agent-thought-message';
+    messageDiv.id = id;
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <details class="agent-thought-container" open>
+                <summary class="agent-thought-title">
+                    <span>🤖 Agent Thought Process</span>
+                </summary>
+                <div class="agent-thought-details" id="${id}_logs">
+                    <div class="tool-call-log">Thinking...</div>
+                </div>
+            </details>
+        </div>
+    `;
+    messagesDiv.appendChild(messageDiv);
+}
+
+function updateThoughtLogs(id, logHTML) {
+    const logsDiv = document.getElementById(`${id}_logs`);
+    if (logsDiv) {
+        logsDiv.innerHTML = logHTML;
+    }
+}
+
+function removeThoughtBox(id) {
+    const box = document.getElementById(id);
+    if (box) box.remove();
+}
+
+function escapedHTML(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 // Message Sending and API Integration
 async function sendMessage() {
     const text = userInput.value.trim();
@@ -314,39 +468,152 @@ async function sendMessage() {
 
     try {
         const selectedModel = modelSelect.value;
-        const apiMessages = activeChat.messages.map(m => ({
-            role: m.role,
-            content: m.content
-        }));
+        let loopCnt = 0;
+        const maxLoops = 5;
+        let finalResponseText = '';
+        let toolCallsMade = false;
+        let thoughtId = 'thought_' + Date.now();
+        let logHTML = '';
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: selectedModel,
-                messages: apiMessages,
-                temperature: 0.7,
-                max_tokens: 1524
-            })
-        });
+        // Continue calling API while LLM requests tool execution
+        while (loopCnt < maxLoops) {
+            loopCnt++;
+            
+            // Format conversation history for API request
+            const apiMessages = activeChat.messages.map(m => {
+                if (m.tool_calls) {
+                    return {
+                        role: m.role,
+                        content: m.content || null,
+                        tool_calls: m.tool_calls
+                    };
+                }
+                if (m.role === 'tool') {
+                    return {
+                        role: m.role,
+                        tool_call_id: m.tool_call_id,
+                        name: m.name,
+                        content: m.content
+                    };
+                }
+                return {
+                    role: m.role,
+                    content: m.content
+                };
+            });
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `HTTP ${response.status}`);
+            // Add system prompt context at the start
+            apiMessages.unshift({
+                role: 'system',
+                content: `You are an advanced AI agent chatbot powered by Groq.
+You have access to tools that can check local time, perform math calculations, and lookup Wikipedia articles.
+Use tools when requested or when answering a query requires information that you do not know. 
+Keep your replies structured, informative, and friendly. Explain briefly what tools you used if you called any.`
+            });
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: selectedModel,
+                    messages: apiMessages,
+                    tools: agentTools,
+                    tool_choice: "auto",
+                    temperature: 0.5,
+                    max_tokens: 1524
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const responseMessage = data.choices[0].message;
+            const toolCalls = responseMessage.tool_calls;
+
+            if (toolCalls && toolCalls.length > 0) {
+                // If it is the first tool call of this message, remove loader and append thought box
+                if (!toolCallsMade) {
+                    removeLoaderHTML(loaderId);
+                    appendThoughtBox(thoughtId);
+                    toolCallsMade = true;
+                }
+
+                // Add tool calls to history
+                activeChat.messages.push({
+                    role: 'assistant',
+                    content: responseMessage.content || '',
+                    tool_calls: toolCalls
+                });
+
+                for (let toolCall of toolCalls) {
+                    const funcName = toolCall.function.name;
+                    const funcArgs = JSON.parse(toolCall.function.arguments);
+                    
+                    logHTML += `<div class="tool-call-log">⚙️ <strong>Running Tool:</strong> <code>${funcName}</code></div>`;
+                    logHTML += `<div class="tool-call-log">💬 <strong>Args:</strong> <code>${JSON.stringify(funcArgs)}</code></div>`;
+                    updateThoughtLogs(thoughtId, logHTML + `<div class="tool-call-log">🤔 Executing...</div>`);
+                    scrollToBottom();
+
+                    let toolOut = '';
+                    if (funcName === 'get_current_time') {
+                        toolOut = getCurrentTime();
+                    } else if (funcName === 'calculate') {
+                        toolOut = calculateExpression(funcArgs.expression);
+                    } else if (funcName === 'search_wikipedia') {
+                        toolOut = await searchWikipedia(funcArgs.query);
+                    } else {
+                        toolOut = `Error: Tool '${funcName}' not found.`;
+                    }
+
+                    const trimmedOut = toolOut.length > 150 ? toolOut.substring(0, 150) + '...' : toolOut;
+                    logHTML += `<div class="tool-call-log">✅ <strong>Output:</strong> ${escapedHTML(trimmedOut)}</div>`;
+                    updateThoughtLogs(thoughtId, logHTML);
+                    scrollToBottom();
+
+                    // Push tool result message
+                    activeChat.messages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        name: funcName,
+                        content: toolOut
+                    });
+                }
+                
+                saveChats();
+                
+                // Show a mini loader at the bottom during the next reasoning step
+                appendLoaderHTML(loaderId);
+                scrollToBottom();
+            } else {
+                // Final text response reached
+                finalResponseText = responseMessage.content || '';
+                break;
+            }
         }
 
-        const data = await response.json();
-        const aiMessage = data.choices[0].message.content;
-
-        // Remove Loader and append AI Message
+        // Clean up and display final response
         removeLoaderHTML(loaderId);
-        activeChat.messages.push({ role: 'assistant', content: aiMessage });
-        appendMessageHTML('assistant', aiMessage);
-        saveChats();
-        scrollToBottom();
+        
+        // Collapse the thought box details after completion
+        if (toolCallsMade) {
+            const detailsEl = document.querySelector(`#${thoughtId} details`);
+            if (detailsEl) detailsEl.removeAttribute('open');
+        }
+
+        if (finalResponseText) {
+            activeChat.messages.push({ role: 'assistant', content: finalResponseText });
+            appendMessageHTML('assistant', finalResponseText);
+            saveChats();
+            scrollToBottom();
+        } else if (!toolCallsMade) {
+            throw new Error("No response content generated by the AI model.");
+        }
 
     } catch (error) {
         console.error('API Error:', error);

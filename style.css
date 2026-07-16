@@ -682,3 +682,52 @@ body.light-theme .message-content pre code {
         grid-template-columns: 1fr;
     }
 }
+
+/* Agent Custom CSS Styles */
+.agent-thought-container {
+    background: rgba(99, 102, 241, 0.05);
+    border-left: 3px solid var(--primary);
+    border-radius: 6px;
+    margin: 12px 0;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+}
+
+body.light-theme .agent-thought-container {
+    background: rgba(99, 102, 241, 0.03);
+}
+
+.agent-thought-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.agent-thought-details {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color);
+    color: var(--text-secondary);
+}
+
+.tool-call-log {
+    margin-bottom: 6px;
+    font-family: monospace;
+    font-size: 0.82rem;
+}
+
+.tool-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin: 2px 0;
+}
